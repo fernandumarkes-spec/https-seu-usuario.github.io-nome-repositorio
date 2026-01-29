@@ -2,6 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { Calculator, TrendingUp, FileText, DollarSign, RefreshCw, FileDown } from 'lucide-react';
 
 export default function SimuladorReformaTributaria() {
+  const [premissas, setPremissas] = useState({
+    faturamento: 120000,
+    folhaPagamento: 35000,
+    baseCreditoLucroReal: 45000,
+    aliquotaCreditoLucroReal: 3.65,
+    baseCreditoReforma: 60000,
+    aliquotaCreditoReforma: 8.5
+  });
+
   const [receitas, setReceitas] = useState({
     pratos: { valor: 50000, pisCofins: 3.65, cbs: 8.5 },
     cervejas: { valor: 30000, pisCofins: 3.65, cbs: 8.5 },
@@ -25,6 +34,15 @@ export default function SimuladorReformaTributaria() {
 
   const [creditoCBSDespesas, setCreditoCBSDespesas] = useState(9.50);
 
+  const [ivaCreditos, setIvaCreditos] = useState([
+    { faixa: 'Faixa 1', base: 12000, aliquota: 2.0 },
+    { faixa: 'Faixa 2', base: 15000, aliquota: 3.5 },
+    { faixa: 'Faixa 3', base: 10000, aliquota: 5.0 },
+    { faixa: 'Faixa 4', base: 8000, aliquota: 6.5 },
+    { faixa: 'Faixa 5', base: 6000, aliquota: 7.5 },
+    { faixa: 'Faixa 6', base: 4000, aliquota: 9.5 }
+  ]);
+
   const calculos = useMemo(() => {
     const totalReceita = Object.values(receitas).reduce((acc, r) => acc + r.valor, 0);
     
@@ -40,11 +58,18 @@ export default function SimuladorReformaTributaria() {
     
     const creditoCBSDespesasValor = totalDespesas * (creditoCBSDespesas / 100);
 
+    const creditoCBSIva = ivaCreditos.reduce(
+      (acc, faixa) => acc + (faixa.base * faixa.aliquota / 100), 0
+    );
+
+    const creditoLucroReal = premissas.baseCreditoLucroReal * (premissas.aliquotaCreditoLucroReal / 100);
+    const creditoReforma = premissas.baseCreditoReforma * (premissas.aliquotaCreditoReforma / 100);
+
     const cbsReceita = Object.values(receitas).reduce(
       (acc, r) => acc + (r.valor * r.cbs / 100), 0
     );
 
-    const creditoCBSTotal = creditoCBSCompras + creditoCBSDespesasValor;
+    const creditoCBSTotal = creditoCBSCompras + creditoCBSDespesasValor + creditoCBSIva + creditoReforma;
     const cbsDevido = cbsReceita - creditoCBSTotal;
 
     const totalCompras = Object.values(compras).reduce((acc, c) => acc + c.valor, 0);
@@ -55,6 +80,9 @@ export default function SimuladorReformaTributaria() {
       cbsReceita,
       creditoCBSCompras,
       creditoCBSDespesasValor,
+      creditoCBSIva,
+      creditoLucroReal,
+      creditoReforma,
       creditoCBSTotal,
       cbsDevido,
       totalCompras,
@@ -62,7 +90,14 @@ export default function SimuladorReformaTributaria() {
       diferencaTributaria: cbsDevido - pisCofinsReceita,
       percentualDiferenca: ((cbsDevido - pisCofinsReceita) / pisCofinsReceita * 100)
     };
-  }, [receitas, compras, despesas, creditoCBSDespesas]);
+  }, [receitas, compras, despesas, creditoCBSDespesas, ivaCreditos, premissas]);
+
+  const updatePremissa = (field, value) => {
+    setPremissas(prev => ({
+      ...prev,
+      [field]: parseFloat(value) || 0
+    }));
+  };
 
   const updateReceita = (key, field, value) => {
     setReceitas(prev => ({
@@ -83,6 +118,14 @@ export default function SimuladorReformaTributaria() {
       ...prev,
       [key]: { ...prev[key], [field]: parseFloat(value) || 0 }
     }));
+  };
+
+  const updateIvaCredito = (index, field, value) => {
+    setIvaCreditos(prev =>
+      prev.map((faixa, i) =>
+        i === index ? { ...faixa, [field]: parseFloat(value) || 0 } : faixa
+      )
+    );
   };
 
   const formatCurrency = (value) => {
@@ -114,6 +157,77 @@ export default function SimuladorReformaTributaria() {
           <div className="grid md:grid-cols-2 gap-8">
             {/* RECEITAS */}
             <div className="space-y-6">
+              <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-xl">
+                <h2 className="text-xl font-bold text-slate-800 mb-4">Premissas Gerais</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Faturamento</label>
+                    <input
+                      type="number"
+                      value={premissas.faturamento}
+                      onChange={(e) => updatePremissa('faturamento', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="Valor R$"
+                    />
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Folha de Pagamento</label>
+                    <input
+                      type="number"
+                      value={premissas.folhaPagamento}
+                      onChange={(e) => updatePremissa('folhaPagamento', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="Valor R$"
+                    />
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Base de Crédito (Lucro Real)</label>
+                    <input
+                      type="number"
+                      value={premissas.baseCreditoLucroReal}
+                      onChange={(e) => updatePremissa('baseCreditoLucroReal', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="Valor R$"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="9.5"
+                      value={premissas.aliquotaCreditoLucroReal}
+                      onChange={(e) => updatePremissa('aliquotaCreditoLucroReal', e.target.value)}
+                      className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="0.00 a 9.50"
+                    />
+                    <span className="text-xs text-gray-500">Alíquota PIS/COFINS %</span>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Base de Crédito (Reforma)</label>
+                    <input
+                      type="number"
+                      value={premissas.baseCreditoReforma}
+                      onChange={(e) => updatePremissa('baseCreditoReforma', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="Valor R$"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="9.5"
+                      value={premissas.aliquotaCreditoReforma}
+                      onChange={(e) => updatePremissa('aliquotaCreditoReforma', e.target.value)}
+                      className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      placeholder="0.00 a 9.50"
+                    />
+                    <span className="text-xs text-gray-500">Alíquota CBS %</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Alíquotas entre 0,00% e 9,50% para simular cenários de crédito.
+                </p>
+              </div>
+
               <div className="bg-gradient-to-r from-green-50 to-green-100 p-6 rounded-xl">
                 <h2 className="text-xl font-bold text-green-800 mb-4 flex items-center gap-2">
                   <DollarSign className="w-5 h-5" />
@@ -140,6 +254,8 @@ export default function SimuladorReformaTributaria() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="9.5"
                           value={data.pisCofins}
                           onChange={(e) => updateReceita(key, 'pisCofins', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -151,6 +267,8 @@ export default function SimuladorReformaTributaria() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="9.5"
                           value={data.cbs}
                           onChange={(e) => updateReceita(key, 'cbs', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -190,6 +308,8 @@ export default function SimuladorReformaTributaria() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="9.5"
                           value={data.pisCofins}
                           onChange={(e) => updateCompra(key, 'pisCofins', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -201,6 +321,8 @@ export default function SimuladorReformaTributaria() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="9.5"
                           value={data.cbs}
                           onChange={(e) => updateCompra(key, 'cbs', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -240,6 +362,8 @@ export default function SimuladorReformaTributaria() {
                         <input
                           type="number"
                           step="0.01"
+                          min="0"
+                          max="9.5"
                           value={data.pisCofins}
                           onChange={(e) => updateDespesa(key, 'pisCofins', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
@@ -281,6 +405,7 @@ export default function SimuladorReformaTributaria() {
                   <div className="bg-white p-4 rounded-lg shadow-md">
                     <p className="text-sm text-gray-600">Receita Total</p>
                     <p className="text-2xl font-bold text-gray-800">{formatCurrency(calculos.totalReceita)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Premissa de faturamento: {formatCurrency(premissas.faturamento)}</p>
                   </div>
 
                   <div className="bg-white p-4 rounded-lg shadow-md border-l-4 border-blue-500">
@@ -302,6 +427,21 @@ export default function SimuladorReformaTributaria() {
                   <div className="bg-white p-4 rounded-lg shadow-md">
                     <p className="text-sm text-gray-600">Créditos CBS - Despesas ({creditoCBSDespesas.toFixed(2)}%)</p>
                     <p className="text-xl font-semibold text-green-600">- {formatCurrency(calculos.creditoCBSDespesasValor)}</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg shadow-md">
+                    <p className="text-sm text-gray-600">Créditos CBS - Faixas IVA</p>
+                    <p className="text-xl font-semibold text-green-600">- {formatCurrency(calculos.creditoCBSIva)}</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg shadow-md">
+                    <p className="text-sm text-gray-600">Crédito PIS/COFINS (Lucro Real)</p>
+                    <p className="text-xl font-semibold text-green-600">- {formatCurrency(calculos.creditoLucroReal)}</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-lg shadow-md">
+                    <p className="text-sm text-gray-600">Crédito CBS (Base Reforma)</p>
+                    <p className="text-xl font-semibold text-green-600">- {formatCurrency(calculos.creditoReforma)}</p>
                   </div>
 
                   <div className="bg-white p-4 rounded-lg shadow-md border-2 border-green-300">
@@ -332,6 +472,45 @@ export default function SimuladorReformaTributaria() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-8 bg-gradient-to-r from-emerald-50 to-emerald-100 p-6 rounded-xl">
+            <h2 className="text-xl font-bold text-emerald-800 mb-4">Faixas de Crédito CBS (IVA)</h2>
+            <p className="text-sm text-emerald-700 mb-4">
+              Defina até 6 variações de crédito de IVA com alíquotas entre 0,00% e 9,50%.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              {ivaCreditos.map((faixa, index) => (
+                <div key={faixa.faixa} className="bg-white p-4 rounded-lg shadow-sm">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">{faixa.faixa}</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        value={faixa.base}
+                        onChange={(e) => updateIvaCredito(index, 'base', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        placeholder="Base R$"
+                      />
+                      <span className="text-xs text-gray-500">Base de crédito</span>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="9.5"
+                        value={faixa.aliquota}
+                        onChange={(e) => updateIvaCredito(index, 'aliquota', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                        placeholder="0.00 a 9.50"
+                      />
+                      <span className="text-xs text-gray-500">Alíquota %</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
